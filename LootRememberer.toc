@@ -1,0 +1,10 @@
+﻿## Interface: 30300
+## Title: Loot Rememberer
+## Author: Bilal Akil
+## Version: 1.0.0
+## Notes: Right click on need, greed, disenchant or pass to remember the selection for that item and auto-apply it in future. Supports stock UI and ElvUI (tested on v7.16). Type /lootrememberer to browse and delete saved records.
+## SavedVariables: LootRemembererDB
+
+embeds.xml
+Locales\Load_Locales.xml
+Core.lua
