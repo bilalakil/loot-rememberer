@@ -154,7 +154,7 @@ function LootRememberer:RecordLootRoll(rollId, rollMode)
     local record = self.db.profile[itemLink]
 
     if record == nil then
-        record = { itemCount, itemLevel, rollMode }
+        record = { itemCount or 1, itemLevel or 1, rollMode }
     else
         record = {
             math.max(record.itemCount, itemCount),
