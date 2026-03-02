@@ -1,7 +1,0 @@
-.env
-.DS_Store
-.release
-.install
-.lua/*
-.vscode
-.idea

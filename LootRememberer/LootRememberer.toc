@@ -1,7 +1,7 @@
 ﻿## Interface: 20505
 ## Title: Loot Rememberer
 ## Author: Bilal Akil
-## Version: 1.1.0
+## Version: 1.1.1
 ## Notes: Right click on need, greed, or pass to remember the selection for that item and auto-apply it in future on that character. (Hold shift to save it to account instead of character.) Type /lootrememberer to browse and delete saved records.
 ## SavedVariables: LootRemembererDB
 

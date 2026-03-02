@@ -14,7 +14,6 @@ local UnitGUID = UnitGUID
 local UISpecialFrames = UISpecialFrames
 -- END GLOBALS
 
-local ADDON_NAME = "LootRememberer"
 local GUI_NUM_RECORDS_PER_PAGE = 10
 local STORAGE_SCOPES = {
     CHAR = "char",
@@ -47,36 +46,34 @@ local ROLL_TYPES = {
     },
 }
 
-LootRememberer = {}
+LootRememberer = CreateFrame("Frame", "LootRemembererFrame", UIParent)
 local L = {
     ["Loot Rememberer"] = "Loot Rememberer",
     ["Filter:"] = "Filter:",
+    ["Loaded with %d remembered loot rolls. Type |cff33ff99/lr|r to manage."] = "Loaded with %d remembered loot rolls. Type |cff33ff99/lr|r to manage.",
+    ["No loot remembered..."] = "No loot remembered...",
+    ["Specific to this character"] = "Specific to this character",
+    ["Affect entire account"] = "Affect entire account",
 }
 
-LootRememberer.eventFrame = CreateFrame("Frame")
-LootRememberer.eventFrame:SetScript("OnEvent", function (_, event, ...)
+LootRememberer:SetScript("OnEvent", function (_, event, ...)
     local handler = LootRememberer[event]
     if handler then
-        handler(LootRememberer, event, ...)
+        handler(LootRememberer, ...)
     end
 end)
-LootRememberer.eventFrame:RegisterEvent("ADDON_LOADED")
+LootRememberer:RegisterEvent("ADDON_LOADED")
 
-function LootRememberer:START_LOOT_ROLL(_, rollId)
-    C_Timer.After(0, function ()
-        self:DeferredLootRollHandler(rollId)
-    end)
-end
-
-function LootRememberer:ADDON_LOADED(_, addonName)
-    if addonName ~= ADDON_NAME then
+function LootRememberer:ADDON_LOADED(addonName)
+    if addonName ~= "LootRememberer" then
         return
     end
 
-    self.TRACE = true
+    self.TRACE = false
     self:Trace("Initializing...")
     self:EnsureDatabase()
-    self.eventFrame:RegisterEvent("START_LOOT_ROLL")
+    self:RegisterEvent("START_LOOT_ROLL")
+    self:RegisterEvent("GET_ITEM_INFO_RECEIVED")
     self:HookIntoStockUI()
     SLASH_LOOTREMEMBERER1 = "/lootrememberer"
     SLASH_LOOTREMEMBERER2 = "/lr"
@@ -84,7 +81,31 @@ function LootRememberer:ADDON_LOADED(_, addonName)
         LootRememberer:SlashProcessor()
     end
     self:GUIPrepare()
+    self:GUISetTotalRecordCount()
+
+    if self.guiState.totalRecordCount ~= 0 then
+        self:Print(string.format(
+            L["Loaded with %d remembered loot rolls. Type |cff33ff99/lr|r to manage."],
+            self.guiState.totalRecordCount
+        ))
+    end
+
     self:Trace("Initialization complete.")
+end
+
+function LootRememberer:START_LOOT_ROLL(rollId)
+    C_Timer.After(0, function ()
+        self:DeferredLootRollHandler(rollId)
+    end)
+end
+
+function LootRememberer:GET_ITEM_INFO_RECEIVED(_, success)
+    if success == false then
+        return
+    end
+
+    -- Unloaded vs loaded items have very different names, which can severely affect sorting.
+    self:GUIMarkSortedEntriesDirty()
 end
 
 function LootRememberer:Print(...)
@@ -318,6 +339,7 @@ function LootRememberer:GUIPrepare()
     self.guiContainer:SetBackdropColor(0, 0, 0, 1)
     self.guiContainer:Hide()
     self.guiContainer:SetScript("OnShow", function () self:GUIRefreshPagination() end)
+    self.guiContainer:SetScript("OnUpdate", function () self:GUIHandleUpdate() end)
 
     self.guiContainer.title = self.guiContainer:CreateFontString(nil, "OVERLAY", "GameFontNormalLarge")
     self.guiContainer.title:SetPoint("TOP", 0, -14)
@@ -385,7 +407,7 @@ function LootRememberer:GUIPrepare()
 
     self.guiContainer.emptyText = self.guiContainer.recordContainer:CreateFontString(nil, "OVERLAY", "GameFontDisable")
     self.guiContainer.emptyText:SetPoint("CENTER", self.guiContainer.recordContainer, "CENTER", 0, 0)
-    self.guiContainer.emptyText:SetText("No loot remembered...")
+    self.guiContainer.emptyText:SetText(L["No loot remembered..."])
 
     self.guiContainer.rows = {}
     for i = 1, GUI_NUM_RECORDS_PER_PAGE do
@@ -484,7 +506,7 @@ function LootRememberer:GUIPrepare()
             self:MoveLootRollRecordScope(recordFrame.itemLink, STORAGE_SCOPES.CHAR)
             self:GUIRefreshPagination()
         end)
-        recordFrame.charScopeIcon:SetScript("OnEnter", function () enterScopeIcon(recordFrame.charScopeIcon, "Specific to this character") end)
+        recordFrame.charScopeIcon:SetScript("OnEnter", function () enterScopeIcon(recordFrame.charScopeIcon, L["Specific to this character"]) end)
         recordFrame.charScopeIcon:SetScript("OnLeave", leaveScopeIcon)
 
         recordFrame.accountScopeIcon = CreateFrame("Button", nil, recordFrame)
@@ -503,7 +525,7 @@ function LootRememberer:GUIPrepare()
             self:MoveLootRollRecordScope(recordFrame.itemLink, STORAGE_SCOPES.ACCOUNT)
             self:GUIRefreshPagination()
         end)
-        recordFrame.accountScopeIcon:SetScript("OnEnter", function () enterScopeIcon(recordFrame.accountScopeIcon, "Affect entire account") end)
+        recordFrame.accountScopeIcon:SetScript("OnEnter", function () enterScopeIcon(recordFrame.accountScopeIcon, L["Affect entire account"]) end)
         recordFrame.accountScopeIcon:SetScript("OnLeave", leaveScopeIcon)
 
         recordFrame.deleteButton = CreateFrame("Button", nil, recordFrame)
@@ -574,6 +596,12 @@ function LootRememberer:GUIPrepare()
 
         self.guiContainer.rows[i] = recordFrame
     end
+end
+
+function LootRememberer:GUIHandleUpdate()
+    if not (self.guiContainer:IsShown() and self.guiState.sortedEntriesDirty) then return end
+    self:Trace("Refreshing display for newly loaded items...")
+    self:GUIRefreshCurrentPageDisplay()
 end
 
 function LootRememberer:GUIMarkSortedEntriesDirty()
